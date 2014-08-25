@@ -1,0 +1,6 @@
+RELEASE-VERSION
+*.egg-info
+*.pyc
+.ropeproject
+.sconsign.dblite
+setup.py
