@@ -30,7 +30,7 @@ class CaptureStdStreams(RedirectStdStreams):
                                                 stderr=self._stderr_stream)
 
 
-def install(packages):
+def install(packages, verbose=True):
     cmd_name, options, args, parser = pip.parseopts(['install'] + packages)
     command = pip.commands['install'](parser)
     streams = CaptureStdStreams()
@@ -38,10 +38,13 @@ def install(packages):
         exit_status = command.main(args[1:], options)
     if exit_status != 0:
         raise RuntimeError(streams._stderr_stream.getvalue())
-    return exit_status
+    if verbose:
+        return streams._stdout_stream.getvalue()
+    else:
+        return exit_status
 
 
-def uninstall(packages):
+def uninstall(packages, verbose=True):
     cmd_name, options, args, parser = pip.parseopts(['uninstall', '-y'] +
                                                     packages)
     command = pip.commands['uninstall'](parser)
@@ -50,7 +53,10 @@ def uninstall(packages):
         exit_status = command.main(args[1:], options)
     if exit_status != 0:
         raise RuntimeError(streams._stderr_stream.getvalue())
-    return exit_status
+    if verbose:
+        return streams._stdout_stream.getvalue()
+    else:
+        return exit_status
 
 
 def freeze():
