@@ -30,44 +30,36 @@ class CaptureStdStreams(RedirectStdStreams):
                                                 stderr=self._stderr_stream)
 
 
-def install(packages, verbose=True):
-    cmd_name, options, args, parser = pip.parseopts(['install'] + packages)
-    command = pip.commands['install'](parser)
-    streams = CaptureStdStreams()
-    with streams:
-        exit_status = command.main(args[1:], options)
-    if exit_status != 0:
-        raise RuntimeError(streams._stderr_stream.getvalue())
-    if verbose:
-        return streams._stdout_stream.getvalue()
-    else:
-        return exit_status
+def install(packages):
+    streams = _run_command(['install'] + packages)
+    return streams._stdout_stream.getvalue()
 
 
 def uninstall(packages, verbose=True):
-    cmd_name, options, args, parser = pip.parseopts(['uninstall', '-y'] +
-                                                    packages)
-    command = pip.commands['uninstall'](parser)
-    streams = CaptureStdStreams()
-    with streams:
-        exit_status = command.main(args[1:], options)
-    if exit_status != 0:
-        raise RuntimeError(streams._stderr_stream.getvalue())
-    if verbose:
-        return streams._stdout_stream.getvalue()
-    else:
-        return exit_status
+    streams = _run_command(['uninstall'] + packages)
+    return streams._stdout_stream.getvalue()
 
 
 def freeze():
-    cmd_name, options, args, parser = pip.parseopts(['freeze'])
-    command = pip.commands['freeze'](parser)
+    streams = _run_command(['freeze'])
+    return sorted([v for v in streams._stdout_stream.getvalue().splitlines()
+                   if v and not v.startswith('#')])
+
+
+def _run_command(*args):
+    try:
+        cmd_name, options, args, parser = pip.parseopts(*args)
+        command = pip.commands[cmd_name](parser)
+    except ValueError:
+        cmd_name, args = pip.parseopts(*args)
+        command = pip.commands[cmd_name]()
+        options = None
     streams = CaptureStdStreams()
     with streams:
-        exit_status = command.main(args[1:], options)
-    if exit_status == 0:
-        return sorted([v for v in
-                       streams._stdout_stream.getvalue().splitlines()
-                       if v and not v.startswith('#')])
-    else:
+        if options is None:
+            exit_status = command.main(args[1:])
+        else:
+            exit_status = command.main(args[1:], options)
+    if exit_status != 0:
         raise RuntimeError(streams._stderr_stream.getvalue())
+    return streams
