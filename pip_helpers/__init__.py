@@ -47,12 +47,21 @@ def freeze():
 
 
 def _run_command(*args):
+    # Find the dictionary of pip commands. In newer version of pip,
+    # the commands are stored in a dictionary called 'commands dict'
+    # and there is a submodule called commands. In older versions,
+    # the dictionary is called 'commands'.
+    try:
+        commands_dict = getattr(pip, 'commands_dict')
+    except AttributeError:
+        commands_dict = getattr(pip, 'commands')
+
     try:
         cmd_name, options, args, parser = pip.parseopts(*args)
-        command = pip.commands[cmd_name](parser)
+        command = commands_dict[cmd_name](parser)
     except ValueError:
         cmd_name, args = pip.parseopts(*args)
-        command = pip.commands[cmd_name]()
+        command = commands_dict[cmd_name]()
         options = None
     streams = CaptureStdStreams()
     with streams:
