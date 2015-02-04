@@ -66,9 +66,9 @@ def _run_command(*args):
     streams = CaptureStdStreams()
     with streams:
         if options is None:
-            exit_status = command.main(args[1:])
+            exit_status = command.main(args)
         else:
-            exit_status = command.main(args[1:], options)
+            exit_status = command.main(args, options)
     if exit_status != 0:
         raise RuntimeError(streams._stderr_stream.getvalue())
     return streams

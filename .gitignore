@@ -4,3 +4,5 @@ RELEASE-VERSION
 .ropeproject
 .sconsign.dblite
 setup.py
+dist/
+paver-minilib.zip

@@ -11,7 +11,7 @@ setup(name='pip_helpers',
       author_email='christian@fobel.net',
       url='http://github.com/wheeler-microfluidics/pip_helpers.git',
       license='GPLv2',
-      install_requires=['pip'],
+      install_requires=['pip>=6.0'],
       packages=['pip_helpers'])
 
 
