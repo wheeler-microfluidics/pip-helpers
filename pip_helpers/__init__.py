@@ -35,7 +35,7 @@ def install(packages):
     return streams._stdout_stream.getvalue()
 
 
-def uninstall(packages, verbose=True):
+def uninstall(packages):
     streams = _run_command(['uninstall'] + packages)
     return streams._stdout_stream.getvalue()
 
