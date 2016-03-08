@@ -62,6 +62,11 @@ def get_releases(package_str, pre=False, key=None,
     all_releases = OrderedDict(sorted([(k, v[0]) for k, v in
                                        package_data['releases'].iteritems()],
                                       key=key))
+
+    if not all_releases:
+        raise KeyError('No releases found for package: {}'
+                       .format(package_request['name']))
+
     match_dict = match.groupdict()
     if match_dict['version_specifiers']:
         comparators = [m.groupdict() for m in CRE_VERSION_SPECIFIERS
@@ -78,8 +83,13 @@ def get_releases(package_str, pre=False, key=None,
 
     # Define regex to check for pre-release.
     cre_pre = re.compile(r'\.dev|\.pre')
-    return OrderedDict([(k, v) for k, v in all_releases.iteritems()
-                        if filter_(k) and (pre or not cre_pre.search(k))])
+    releases = OrderedDict([(k, v) for k, v in all_releases.iteritems()
+                            if filter_(k) and (pre or not cre_pre.search(k))])
+    if not releases:
+        raise KeyError('None of the following releases match the specifiers '
+                       '"{}": {}'.format(package_request['version_specifiers'],
+                                         ', '.join(all_releases.keys())))
+    return releases
 
 
 class RedirectStdStreams(object):
