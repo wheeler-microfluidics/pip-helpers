@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from contextlib import contextmanager
 import cStringIO as StringIO
 import json
 import re
@@ -40,9 +41,9 @@ def get_releases(package_str, pre=False, key=None,
     Returns
     -------
 
-        (collections.OrderedDict) : Package release information, indexed by
-            package version string and ordered by upload time (i.e., most
-            recent release is last).
+        (string, collections.OrderedDict) : Package name and package release
+            information, indexed by package version string and ordered by
+            upload time (i.e., most recent release is last).
 
 
     [1]: https://www.python.org/dev/peps/pep-0440/#version-specifiers
@@ -89,7 +90,7 @@ def get_releases(package_str, pre=False, key=None,
         raise KeyError('None of the following releases match the specifiers '
                        '"{}": {}'.format(package_request['version_specifiers'],
                                          ', '.join(all_releases.keys())))
-    return releases
+    return package_request['name'], releases
 
 
 class RedirectStdStreams(object):
@@ -118,27 +119,33 @@ class CaptureStdStreams(RedirectStdStreams):
                                                 stderr=self._stderr_stream)
 
 
-def install(packages):
-    streams = _run_command(['install'] + packages)
-    return streams._stdout_stream.getvalue()
+def install(packages, capture_streams=True):
+    result = _run_command(['install'] + packages,
+                          capture_streams=capture_streams)
+    if capture_streams:
+        return result._stdout_stream.getvalue()
 
 
-def uninstall(packages):
-    streams = _run_command(['uninstall'] + packages)
-    return streams._stdout_stream.getvalue()
+def uninstall(packages, capture_streams=True):
+    result = _run_command(['uninstall'] + packages,
+                          capture_streams=capture_streams)
+    if capture_streams:
+        return result._stdout_stream.getvalue()
 
 
-def freeze():
-    streams = _run_command(['freeze'])
-    return sorted([v for v in streams._stdout_stream.getvalue().splitlines()
-                   if v and not v.startswith('#')])
+def freeze(capture_streams=True):
+    result = _run_command(['freeze'], capture_streams=capture_streams)
+    if capture_streams:
+        return sorted([v for v in result._stdout_stream.getvalue().splitlines()
+                       if v and not v.startswith('#')])
 
 
-def _run_command(*args):
+def _run_command(*args, **kwargs):
     # Find the dictionary of pip commands. In newer version of pip,
     # the commands are stored in a dictionary called 'commands dict'
     # and there is a submodule called commands. In older versions,
     # the dictionary is called 'commands'.
+    capture_streams = kwargs.pop('capture_streams', True)
     try:
         commands_dict = getattr(pip, 'commands_dict')
     except AttributeError:
@@ -151,12 +158,23 @@ def _run_command(*args):
         cmd_name, args = pip.parseopts(*args)
         command = commands_dict[cmd_name]()
         options = None
-    streams = CaptureStdStreams()
-    with streams:
+
+    if capture_streams:
+        context = CaptureStdStreams()
+    else:
+        # No-op context.  See [here][1].
+        #
+        # [1]: http://seriously.dontusethiscode.com/2013/04/15/shortest-contextmanager.html
+        noop = contextmanager(lambda: (yield))
+        context = noop()
+    with context:
         if options is None:
             exit_status = command.main(args)
         else:
             exit_status = command.main(args, options)
     if exit_status != 0:
-        raise RuntimeError(streams._stderr_stream.getvalue())
-    return streams
+        message = (context._stderr_stream.getvalue() if capture_streams
+                   else 'Error running command: "{}"'.format(' '.join(args)))
+        raise RuntimeError(message)
+    if capture_streams:
+        return context
