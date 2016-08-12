@@ -105,88 +105,38 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
     return package_request['name'], releases
 
 
-class RedirectStdStreams(object):
-    def __init__(self, stdout=None, stderr=None):
-        self._stdout = stdout or sys.stdout
-        self._stderr = stderr or sys.stderr
-
-    def __enter__(self):
-        self.old_stdout, self.old_stderr = sys.stdout, sys.stderr
-        self.old_stdout.flush()
-        self.old_stderr.flush()
-        sys.stdout, sys.stderr = self._stdout, self._stderr
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._stdout.flush()
-        self._stderr.flush()
-        sys.stdout = self.old_stdout
-        sys.stderr = self.old_stderr
-
-
-class CaptureStdStreams(RedirectStdStreams):
-    def __init__(self):
-        self._stdout_stream = StringIO.StringIO()
-        self._stderr_stream = StringIO.StringIO()
-        super(CaptureStdStreams, self).__init__(stdout=self._stdout_stream,
-                                                stderr=self._stderr_stream)
-
-
 def install(packages, capture_streams=True):
-    result = _run_command(['install'] + packages,
-                          capture_streams=capture_streams)
-    if capture_streams:
-        return result._stdout_stream.getvalue()
+    return _run_command('install', *packages, capture_streams=capture_streams)
 
 
 def uninstall(packages, capture_streams=True):
-    result = _run_command(['uninstall'] + packages,
-                          capture_streams=capture_streams)
-    if capture_streams:
-        return result._stdout_stream.getvalue()
+    return _run_command('uninstall', *packages,
+                        capture_streams=capture_streams)
 
 
-def freeze(capture_streams=True):
-    result = _run_command(['freeze'], capture_streams=capture_streams)
-    if capture_streams:
-        return sorted([v for v in result._stdout_stream.getvalue().splitlines()
-                       if v and not v.startswith('#')])
+def freeze():
+    output = _run_command('freeze', capture_streams=False)
+    return sorted([v for v in output.splitlines()
+                   if v and not v.startswith('#')])
 
 
 def _run_command(*args, **kwargs):
-    # Find the dictionary of pip commands. In newer version of pip,
-    # the commands are stored in a dictionary called 'commands dict'
-    # and there is a submodule called commands. In older versions,
-    # the dictionary is called 'commands'.
-    capture_streams = kwargs.pop('capture_streams', True)
-    try:
-        commands_dict = getattr(pip, 'commands_dict')
-    except AttributeError:
-        commands_dict = getattr(pip, 'commands')
+    capture_streams = kwargs.pop('capture_streams', False)
+    ostream = kwargs.pop('ostream', sys.stdout)
 
-    try:
-        cmd_name, options, args, parser = pip.parseopts(*args)
-        command = commands_dict[cmd_name](parser)
-    except ValueError:
-        cmd_name, args = pip.parseopts(*args)
-        command = commands_dict[cmd_name]()
-        options = None
-
-    if capture_streams:
-        context = CaptureStdStreams()
-    else:
-        # No-op context.  See [here][1].
-        #
-        # [1]: http://seriously.dontusethiscode.com/2013/04/15/shortest-contextmanager.html
-        noop = contextmanager(lambda: (yield))
-        context = noop()
-    with context:
-        if options is None:
-            exit_status = command.main(args)
-        else:
-            exit_status = command.main(args, options)
-    if exit_status != 0:
-        message = (context._stderr_stream.getvalue() if capture_streams
-                   else 'Error running command: "{}"'.format(' '.join(args)))
-        raise RuntimeError(message)
-    if capture_streams:
-        return context
+    # Install required packages using `pip`, with Wheeler Lab wheels server
+    # for binary wheels not available on `PyPi`.
+    process_args = (sys.executable, '-m', 'pip') + args
+    process = sp.Popen(process_args, stdout=sp.PIPE, stderr=sp.STDOUT,
+                       shell=True)
+    lines = []
+    for stdout_i in iter(process.stdout.readline, b''):
+        if capture_streams:
+            ostream.write('.')
+        lines.append(stdout_i)
+    process.wait()
+    print >> ostream, ''
+    output = '\n'.join(lines)
+    if process.returncode != 0:
+        raise RuntimeError(output)
+    return output
