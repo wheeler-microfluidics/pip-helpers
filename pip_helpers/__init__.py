@@ -3,10 +3,16 @@ from contextlib import contextmanager
 import cStringIO as StringIO
 import json
 import re
+import subprocess as sp
 import sys
+try:
+    import xmlrpclib
+except ImportError:
+    import xmlrpc.client as xmlrpclib
 
 import natsort
 import pip
+import pkg_resources
 import requests
 
 
@@ -24,8 +30,9 @@ CRE_VERSION_SPECIFIERS = re.compile(r'(?P<comparator>{compare_pattern})'
                                     re.VERBOSE)
 
 
-def get_releases(package_str, pre=False, key=None,
-                 server_url='https://pypi.python.org/pypi/{}/json'):
+def get_releases(package_str, pre=False, key=None, include_hidden=False,
+                 server_url='https://pypi.python.org/pypi/{}/json',
+                 hidden_url='https://pypi.python.org/pypi/'):
     '''
     Query Python Package Index for list of available release for specified
     package.
@@ -57,12 +64,17 @@ def get_releases(package_str, pre=False, key=None,
     response = requests.get(server_url.format(package_request['name']))
     package_data = json.loads(response.text)
 
+    if not include_hidden:
+        client = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
+        public_releases = set(client.package_releases(package_request['name']))
+
     if key is None:
-        key = lambda (k, v): v['upload_time']
+        key = lambda (k, v): pkg_resources.parse_version(k)
 
     all_releases = OrderedDict(sorted([(k, v[0]) for k, v in
-                                       package_data['releases'].iteritems()],
-                                      key=key))
+                                       package_data['releases'].iteritems()
+                                       if include_hidden or k in
+                                       public_releases], key=key))
 
     if not all_releases:
         raise KeyError('No releases found for package: {}'
