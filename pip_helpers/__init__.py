@@ -115,7 +115,7 @@ def install(packages, capture_streams=True):
 
 
 def uninstall(packages, capture_streams=True):
-    return _run_command('uninstall', *packages,
+    return _run_command('uninstall', *(['-y'] + list(packages)),
                         capture_streams=capture_streams)
 
 
