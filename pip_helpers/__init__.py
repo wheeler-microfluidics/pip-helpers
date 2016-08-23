@@ -1,6 +1,4 @@
 from collections import OrderedDict
-from contextlib import contextmanager
-import cStringIO as StringIO
 import json
 import re
 import subprocess as sp
@@ -11,7 +9,6 @@ except ImportError:
     import xmlrpc.client as xmlrpclib
 
 import natsort
-import pip
 import pkg_resources
 import requests
 
@@ -29,10 +26,12 @@ CRE_VERSION_SPECIFIERS = re.compile(r'(?P<comparator>{compare_pattern})'
                                     .format(compare_pattern=COMPARE_PATTERN),
                                     re.VERBOSE)
 
+DEFAULT_SERVER_URL = 'https://pypi.python.org/pypi/{}/json'
+DEFAULT_HIDDEN_URL = 'https://pypi.python.org/pypi/'
+
 
 def get_releases(package_str, pre=False, key=None, include_hidden=False,
-                 server_url='https://pypi.python.org/pypi/{}/json',
-                 hidden_url='https://pypi.python.org/pypi/'):
+                 server_url=DEFAULT_SERVER_URL, hidden_url=None):
     '''
     Query Python Package Index for list of available release for specified
     package.
@@ -55,6 +54,12 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
 
     [1]: https://www.python.org/dev/peps/pep-0440/#version-specifiers
     '''
+    if all([not include_hidden, hidden_url is None, server_url ==
+            DEFAULT_SERVER_URL]):
+        hidden_url = DEFAULT_HIDDEN_URL
+    if hidden_url is None:
+        include_hidden = True
+
     match = CRE_PACKAGE.match(package_str)
     if not match:
         raise ValueError('Invalid package descriptor. Must be like "foo", '
@@ -65,7 +70,7 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
     package_data = json.loads(response.text)
 
     if not include_hidden:
-        client = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
+        client = xmlrpclib.ServerProxy(hidden_url)
         public_releases = set(client.package_releases(package_request['name']))
 
     if key is None:
@@ -80,10 +85,10 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
         raise KeyError('No releases found for package: {}'
                        .format(package_request['name']))
 
-    match_dict = match.groupdict()
-    if match_dict['version_specifiers']:
+    package_request = match.groupdict()
+    if package_request['version_specifiers']:
         comparators = [m.groupdict() for m in CRE_VERSION_SPECIFIERS
-                       .finditer(match_dict['version_specifiers'])]
+                       .finditer(package_request['version_specifiers'])]
     else:
         comparators = []
 
