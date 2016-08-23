@@ -36,23 +36,34 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
     Query Python Package Index for list of available release for specified
     package.
 
-    Args
-    ----
-
-        package_str (str) : Name of package hosted on Python package index.
-            Version constraints are also supported (e.g., `"foo", "foo==1.0",
-            "foo>=1.0"`, etc.)  See [version specifiers][1] reference for more
-            details.
+    Parameters
+    ----------
+    package_str : str
+        Name of package hosted on Python package index. Version constraints are
+        also supported (e.g., ``"foo", "foo==1.0", "foo>=1.0"``, etc.).  See
+        `version specifiers`_ reference for more details.
+    pre : bool, optional
+        Include pre-release packages.
+    key : function, optional
+        Key function to sort ``(package_name, release_info)`` items by.
+    include_hidden : bool, optional
+        Include "hidden" packages.
+    server_url : str, optional
+        URL to JSON API (default=``'https://pypi.python.org/pypi/{}/json'``).
+    hidden_url : str, optional
+        URL to XMLRPC API (default=``'https://pypi.python.org/pypi/'`` for PyPI
+        server URL).
 
     Returns
     -------
+    (string, collections.OrderedDict)
+        Package name and package release information, indexed by package
+        version string and ordered by upload time (i.e., most recent release is
+        last).
 
-        (string, collections.OrderedDict) : Package name and package release
-            information, indexed by package version string and ordered by
-            upload time (i.e., most recent release is last).
 
-
-    [1]: https://www.python.org/dev/peps/pep-0440/#version-specifiers
+    .. _version specifiers:
+        https://www.python.org/dev/peps/pep-0440/#version-specifiers
     '''
     if all([not include_hidden, hidden_url is None, server_url ==
             DEFAULT_SERVER_URL]):
@@ -111,21 +122,74 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
 
 
 def install(packages, capture_streams=True):
+    '''
+    Install the specified list of packages from the Python Package Index.
+
+    Parameters
+    ----------
+    packages : list
+        List of package descriptors (e.g., ``"foo", "foo==1.0", "foo>=1.0"``).
+    capture_streams : bool, optional
+        If ``True``, capture ``stdout`` and ``stderr`` output and instead print
+        concise progress indicator.
+
+    Returns
+    -------
+    str
+        Combined output to ``stdout`` and ``stderr``.
+    '''
     return _run_command('install', *packages, capture_streams=capture_streams)
 
 
 def uninstall(packages, capture_streams=True):
+    '''
+    Uninstall the specified list of Python packages
+
+    Parameters
+    ----------
+    packages : list
+        List of package names (e.g., ``"foo"``, but not ``"foo==1.0",
+        "foo>=1.0"``).
+    capture_streams : bool, optional
+        If ``True``, capture ``stdout`` and ``stderr`` output and instead print
+        concise progress indicator.
+
+    Returns
+    -------
+    str
+        Combined output to ``stdout`` and ``stderr``.
+    '''
     return _run_command('uninstall', *(['-y'] + list(packages)),
                         capture_streams=capture_streams)
 
 
 def freeze():
+    '''
+    Return sorted list of package descriptors (e.g., ``"foo", "foo==1.0",
+    "foo>=1.0"``), one descriptor for each installed package.
+    '''
     output = _run_command('freeze', capture_streams=False)
     return sorted([v for v in output.splitlines()
                    if v and not v.startswith('#')])
 
 
 def _run_command(*args, **kwargs):
+    '''
+    Run ``pip`` with the specified arguments.
+
+    Parameters
+    ----------
+    capture_streams : bool, optional
+        If ``True``, capture ``stdout`` and ``stderr`` output and instead print
+        concise progress indicator.  (default=``False``)
+    ostream : file-like, optional
+        Write ``stdout`` and ``stderr`` to ``ostream``.
+
+    Returns
+    -------
+    str
+        Combined output to ``stdout`` and ``stderr``.
+    '''
     capture_streams = kwargs.pop('capture_streams', False)
     ostream = kwargs.pop('ostream', sys.stdout)
 

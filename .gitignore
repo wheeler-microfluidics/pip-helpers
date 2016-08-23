@@ -6,3 +6,6 @@ RELEASE-VERSION
 setup.py
 dist/
 paver-minilib.zip
+build/
+docs/_build
+docs/README.rst
