@@ -1,4 +1,3 @@
 natsort
-numpydoc
 pip>=6.0
 requests
