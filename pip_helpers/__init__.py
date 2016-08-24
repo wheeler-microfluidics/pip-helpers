@@ -15,7 +15,7 @@ import requests
 
 COMPARE_PATTERN = r'(!=|==|>=|<=|>|<)'
 CRE_PACKAGE = re.compile(r'''
-    ^(?P<name>[_a-zA-Z][\w_]+)\s*
+    ^(?P<name>[_a-zA-Z][\w_\-\.]+)\s*
      (?P<version_specifiers>
       {compare_pattern}\s*[\w\._]+
       (\s*,\s*{compare_pattern}
@@ -89,8 +89,8 @@ def get_releases(package_str, pre=False, key=None, include_hidden=False,
 
     all_releases = OrderedDict(sorted([(k, v[0]) for k, v in
                                        package_data['releases'].iteritems()
-                                       if include_hidden or k in
-                                       public_releases], key=key))
+                                       if v and (include_hidden or k in
+                                                 public_releases)], key=key))
 
     if not all_releases:
         raise KeyError('No releases found for package: {}'
