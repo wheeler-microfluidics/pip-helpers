@@ -196,8 +196,7 @@ def _run_command(*args, **kwargs):
     # Install required packages using `pip`, with Wheeler Lab wheels server
     # for binary wheels not available on `PyPi`.
     process_args = (sys.executable, '-m', 'pip') + args
-    process = sp.Popen(process_args, stdout=sp.PIPE, stderr=sp.STDOUT,
-                       shell=True)
+    process = sp.Popen(process_args, stdout=sp.PIPE, stderr=sp.STDOUT)
     lines = []
     for stdout_i in iter(process.stdout.readline, b''):
         if capture_streams:
