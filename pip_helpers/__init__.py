@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import json
+import logging
 import re
 import subprocess as sp
 import sys
@@ -11,6 +12,9 @@ except ImportError:
 import natsort
 import pkg_resources
 import requests
+
+
+logger = logging.getLogger(__name__)
 
 
 COMPARE_PATTERN = r'(!=|==|>=|<=|>|<)'
@@ -165,12 +169,84 @@ def uninstall(packages, capture_streams=True):
 
 def freeze():
     '''
-    Return sorted list of package descriptors (e.g., ``"foo", "foo==1.0",
-    "foo>=1.0"``), one descriptor for each installed package.
+    Returns
+    -------
+    list
+        Sorted list of package descriptors (e.g., ``"foo", "foo==1.0",
+        "foo>=1.0"``), one descriptor for each installed package.
     '''
     output = _run_command('freeze', capture_streams=False)
     return sorted([v for v in output.splitlines()
                    if v and not v.startswith('#')])
+
+
+def upgrade(package_name):
+    '''
+    Upgrade package, without upgrading dependencies that are already satisfied.
+
+    See `here`_ for more details.
+
+    .. _here: https://gist.github.com/qwcode/3088149
+
+    Parameters
+    ----------
+    package_name : str
+        Package name.
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+         - :data:`original_version`: Package version before upgrade.
+         - :data:`new_version`: Package version after upgrade (`None` if
+           package was not upgraded).
+         - :data:`installed_dependencies`: List of dependencies installed
+           during package upgrade.  Each dependency is represented as a
+           dictionary of the form ``{'package': ..., 'version': ...}``.
+
+    Raises
+    ------
+    pkg_resources.DistributionNotFound
+        If package not installed.
+    '''
+    # `pkg_resources.DistributionNotFound` raised if package not installed.
+    version = pkg_resources.get_distribution(package_name).version
+
+    # Upgrade package *without installing any dependencies*.
+    upgrade_output = install(['-U', '--no-deps', '--no-cache', package_name])
+
+    cre_installed = re.compile(r'(?P<package>[^\s]+)-'
+                               r'(?P<version>[^\s\-]+)(\s+|$)')
+
+    result = {'original_version': version,
+              'new_version': None,
+              'installed_dependencies': []}
+
+    # Check if new version was installed (i.e., if package was upgraded).
+    upgrade_last_line = upgrade_output.splitlines()[-1]
+    if upgrade_last_line.startswith('Successfully installed'):
+        # Package was upgraded.
+        new_version = cre_installed.search(upgrade_last_line).group('version')
+        logger.debug('Package upgraded: %s-%s->%s-%s', package_name, version,
+                     package_name, new_version)
+
+        # Install any *new* dependencies.
+        dependencies_output = install(['--no-cache', package_name])
+        dependencies_last_line = dependencies_output.splitlines()[-1]
+        installed_dependencies = [match_i.groupdict()
+                                  for match_i in cre_installed
+                                  .finditer(dependencies_last_line)]
+        for dependency_i in installed_dependencies:
+            logger.debug('Dependency installed: %s-%s',
+                         dependency_i['package'], dependency_i['version'])
+        result['new_version'] = new_version
+        result['installed_dependencies'] = installed_dependencies
+    elif upgrade_last_line.startswith('Requirement already up-to-date'):
+        # Package up to date.
+        logger.debug('Package up-to-date: %s==%s', package_name, version)
+    else:
+        raise RuntimeError('Unexpected output:\n{}'.format(upgrade_output))
+    return result
 
 
 def _run_command(*args, **kwargs):
