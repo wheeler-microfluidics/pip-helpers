@@ -1,3 +1,4 @@
+![https://ci.appveyor.com/api/projects/status/github/wheeler-microfluidics/pip-helpers?branch=master&svg=true](https://ci.appveyor.com/api/projects/status/github/wheeler-microfluidics/pip-helpers?branch=master&svg=true)
 # pip-helpers #
 
 Functions to perform common operations with the Python Package Index.
